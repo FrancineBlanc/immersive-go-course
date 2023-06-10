@@ -8,19 +8,22 @@ import (
 )
 
 func main() {
+	client()
+}
+
+func client() {
 	resp, err := http.Get("http://localhost:8080")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer resp.Body.Close()
 
-	fmt.Println("HTTP Response Status: ", resp.StatusCode)
-
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println(err)
+		log.Fatal(err)
 	}
-	fmt.Println(string(body))
-}
 
-// TODO: write second function that returns the error from the GET req, have main call this func, and if error == nil main will finish, else can use log fatal if error can't be reversed.
+	if resp.StatusCode == 200 {
+		fmt.Println(string(body))
+	}
+}
