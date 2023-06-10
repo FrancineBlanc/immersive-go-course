@@ -5,6 +5,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
+	"time"
 )
 
 func main() {
@@ -25,5 +27,12 @@ func client() {
 
 	if resp.StatusCode == 200 {
 		fmt.Println(string(body))
+	} else if resp.StatusCode == 429 {
+		if secs, _ := strconv.Atoi(resp.Header.Get("Retry-After")); secs >= 1 && secs <= 10 {
+			fmt.Println("Retrying in", secs, "seconds...")
+			time.Sleep(time.Duration(secs) * time.Second)
+			client()
+		}
 	}
+
 }
