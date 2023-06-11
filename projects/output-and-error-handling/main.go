@@ -3,43 +3,53 @@ package main
 import (
 	"fmt"
 	"io"
-	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 )
 
 func main() {
-	client()
+	_, err, _, _ := getRequest()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	} else {
+		client()
+	}
 }
 
-func client() {
+func getRequest() (string, error, int, string) {
 	resp, err := http.Get("http://localhost:8080")
 	if err != nil {
-		log.Fatal(err)
+		return "", fmt.Errorf("the weather cannot be retrieved right now"), 0, ""
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatal(err)
+		return "", fmt.Errorf("unable to read weather data at present"), 0, ""
 	}
+	return string(body), nil, resp.StatusCode, resp.Header.Get("Retry-After")
+}
 
-	if resp.StatusCode == 200 {
+func client() {
+	body, _, statusCode, retryAfter := getRequest()
+	if statusCode == 200 {
 		fmt.Println(string(body))
-	} else if resp.StatusCode == 429 {
-		if resp.Header.Get("Retry-After") == "a while" {
-			fmt.Println("Experiencing high amounts of traffic...retrying again...")
+	} else if statusCode == 429 {
+		if retryAfter == "a while" {
+			fmt.Println("Experiencing high volumes of traffic...retrying again...")
 			time.Sleep(time.Duration(4) * time.Second)
 			client()
-		} else if secs, _ := strconv.Atoi(resp.Header.Get("Retry-After")); secs >= 1 && secs < 5 {
+		} else if secs, _ := strconv.Atoi(retryAfter); secs >= 1 && secs < 5 {
 			fmt.Println("Retrying in", secs, "seconds...")
 			time.Sleep(time.Duration(secs) * time.Second)
 			client()
-		} else if secs, _ := strconv.Atoi(resp.Header.Get("Retry-After")); secs >= 5 {
+		} else if secs, _ := strconv.Atoi(retryAfter); secs >= 5 {
 			fmt.Println("Weather cannot be retrieved :(")
 		} else {
-			t, _ := http.ParseTime(resp.Header.Get("Retry-After"))
+			t, _ := http.ParseTime(retryAfter)
 			unixTime := t.UTC().Unix()
 			currentTime := time.Now().UTC().Unix()
 			retrySecs := unixTime - currentTime
