@@ -10,14 +10,9 @@ import (
 )
 
 func main() {
-	_, _, _, err := getRequest()
-	if err != nil {
-		os.Stderr, _ = os.Create("stderr-log.txt")
-		fmt.Println(err)
-		fmt.Fprintf(os.Stderr, "Connection dropped: %v\n", err)
+	exitCode := client()
+	if exitCode == 1 {
 		os.Exit(1)
-	} else {
-		client()
 	}
 	// TO CHECK - What if there was more code in main, and an err has been thrown
 }
@@ -59,8 +54,14 @@ func calculateSecs(retryHeader string) int {
 	return secs
 }
 
-func client() {
-	body, retryAfterHeader, statusCode, _ := getRequest()
+func client() int {
+	body, retryAfterHeader, statusCode, err := getRequest()
+	if err != nil {
+		os.Stderr, _ = os.Create("stderr-log.txt")
+		fmt.Println(err)
+		fmt.Fprintf(os.Stderr, "Connection dropped: %v\n", err)
+		return 1
+	}
 	if statusCode == 200 {
 		fmt.Println(string(body))
 	} else if statusCode == 429 {
@@ -75,4 +76,5 @@ func client() {
 			}
 		}
 	}
+	return 0
 }
