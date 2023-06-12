@@ -10,16 +10,16 @@ import (
 )
 
 func main() {
-	body, _, statusCode, err := getRequest()
+	_, _, _, err := getRequest()
 	if err != nil {
 		os.Stderr, _ = os.Create("stderr-log.txt")
 		fmt.Println(err)
 		fmt.Fprintf(os.Stderr, "Connection dropped: %v\n", err)
 		os.Exit(1)
-	} else if statusCode == 200 {
-		successCall(body)
+	} else {
+		client()
 	}
-	// TO CHECK - What if there was more code in main, and an err has occurred?
+	// TO CHECK - What if there was more code in main, and an err has been thrown
 }
 
 func getRequest() (string, string, int, error) {
@@ -36,36 +36,42 @@ func getRequest() (string, string, int, error) {
 	return string(body), resp.Header.Get("Retry-After"), resp.StatusCode, nil
 }
 
-func successCall(respBody string) {
-	fmt.Println(respBody)
+func retryAfterAWhile() {
+	fmt.Println("Experiencing high volumes of traffic...retrying again...")
+	time.Sleep(time.Duration(4) * time.Second)
+	client()
+}
+
+func retryInSeconds(secs int) {
+	fmt.Println("Retrying in", secs, "second(s)...")
+	time.Sleep(time.Duration(secs) * time.Second)
+	client()
+}
+
+func calculateSecs(retryHeader string) int {
+	secs, err := strconv.Atoi(retryHeader)
+	if err != nil {
+		t, _ := http.ParseTime(retryHeader)
+		unixTime := t.UTC().Unix()
+		currentTime := time.Now().UTC().Unix()
+		secs = int(unixTime - currentTime)
+	}
+	return secs
 }
 
 func client() {
-	body, retryAfter, statusCode, _ := getRequest()
+	body, retryAfterHeader, statusCode, _ := getRequest()
 	if statusCode == 200 {
 		fmt.Println(string(body))
 	} else if statusCode == 429 {
-		if retryAfter == "a while" {
-			fmt.Println("Experiencing high volumes of traffic...retrying again...")
-			time.Sleep(time.Duration(4) * time.Second)
-			client()
-		} else if secs, _ := strconv.Atoi(retryAfter); secs >= 1 && secs < 5 {
-			fmt.Println("Retrying in", secs, "seconds...")
-			time.Sleep(time.Duration(secs) * time.Second)
-			client()
-		} else if secs, _ := strconv.Atoi(retryAfter); secs >= 5 {
-			fmt.Println("Weather cannot be retrieved :(")
+		if retryAfterHeader == "a while" {
+			retryAfterAWhile()
 		} else {
-			t, _ := http.ParseTime(retryAfter)
-			unixTime := t.UTC().Unix()
-			currentTime := time.Now().UTC().Unix()
-			retrySecs := unixTime - currentTime
-			if retrySecs > 5 {
-				fmt.Println("Weather cannot be retrieved :(")
+			secs := calculateSecs(retryAfterHeader)
+			if secs >= 1 && secs < 5 {
+				retryInSeconds(secs)
 			} else {
-				fmt.Println("Retrying in", retrySecs, "seconds...")
-				time.Sleep(time.Duration(retrySecs) * time.Second)
-				client()
+				fmt.Println("Weather cannot be retrieved :(")
 			}
 		}
 	}
